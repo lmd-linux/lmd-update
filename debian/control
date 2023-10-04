@@ -1,0 +1,12 @@
+Source: lmd-update
+Maintainer: lmd Linux <lmd.linux@gmail.com>
+Section: misc
+Priority: important
+Standards-Version: 4.6.2
+Build-Depends: debhelper-compat (= 13)
+
+Package: lmd-update
+Architecture: all
+Depends: curl, iputils-ping, jq
+Description: automatic updates for lmd Linux
+ Services, scripts and configuration for automatic updates of lmd Linux

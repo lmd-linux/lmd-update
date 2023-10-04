@@ -1,0 +1,56 @@
+#! /bin/bash
+set -e
+
+LMD_DIR=/lib/lmd
+
+if [[ "$(cat /proc/cmdline | sed 's/.*subvol=\([^ ]*\).*/\1/')" != "@rootfs" ]]; then
+    echo "Will not upgrade system snapshot"
+    exit
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+echo "Cleaning previous install in case it failed"
+dpkg --configure -a || true
+
+echo "Waiting to be online"
+while ! ping -c 1 deb.debian.org &>/dev/null; do
+    sleep 10
+done
+
+echo "Finish upgrading packages in case previous upgrade was interrupted"
+apt-get dist-upgrade -m -f -y -o Dpkg::Options::="--force-confold" < /dev/null
+
+TEMP_MOUNT=$(mktemp -d)
+MAIN_VOLUME=$(cat /proc/cmdline | sed -n 's/.* root=\([^ ]*\).*/\1/p')
+SUBVOLUME=@lmd-$(date +%y%m%d%H%M%S)
+mount ${MAIN_VOLUME} ${TEMP_MOUNT}
+btrfs subvolume snapshot ${TEMP_MOUNT}/@rootfs ${TEMP_MOUNT}/${SUBVOLUME}
+
+UPDATABLE=""
+for UPDATE_SCRIPT in ${LMD_DIR}/update.d/*; do
+    if [[ -n "$("${UPDATE_SCRIPT}" check)" ]]; then
+        if [[ -n "${UPDATABLE}" ]]; then
+            UPDATABLE="${UPDATABLE} "
+        fi
+        UPDATABLE="${UPDATABLE}${UPDATE_SCRIPT}"
+    fi
+done
+if [[ -z "${UPDATABLE}" ]]; then
+    echo "Nothing to update"
+    btrfs subvolume delete ${TEMP_MOUNT}/${SUBVOLUME}
+    umount ${TEMP_MOUNT}
+    rmdir ${TEMP_MOUNT}
+    exit
+fi
+
+umount ${TEMP_MOUNT}
+rmdir ${TEMP_MOUNT}
+
+for UPDATE_SCRIPT in ${UPDATABLE}; do
+    echo "Running ${UPDATE_SCRIPT}"
+    ${UPDATE_SCRIPT} update
+done
+
+${LMD_DIR}/prune-system-snapshots
+update-grub

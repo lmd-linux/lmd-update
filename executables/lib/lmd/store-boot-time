@@ -1,0 +1,4 @@
+#! /bin/bash
+set -e
+
+date +%y%m%d%H%M%S > /boot/last_booted

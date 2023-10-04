@@ -1,0 +1,14 @@
+#! /bin/bash
+set -e
+
+if [[ "${1}" == "check" ]]; then
+    apt-get update -y &>/dev/null
+    apt list --upgradable 2>/dev/null | tail -n +2
+fi
+
+if [[ "${1}" == "update" ]]; then
+    echo "Clean package cache"
+    apt-get clean -y < /dev/null
+    echo "Upgrade new packages"
+    apt-get dist-upgrade -m -y -o Dpkg::Options::="--force-confold" < /dev/null
+fi
