@@ -1,0 +1,26 @@
+#! /bin/bash
+set -e
+
+if [[ -f /etc/lmd/auto-update.conf ]]; then
+    KEEP_LAST_SNAPSHOTS=$(sed -n 's/^keep_last_snapshots=//p' /etc/lmd/auto-update.conf)
+else
+    echo "Could not find /etc/lmd/auto-update.conf"
+fi
+if [[ -z "${KEEP_LAST_SNAPSHOTS}" ]] || [[ -n "${KEEP_LAST_SNAPSHOTS//[0-9]}" ]]; then
+    echo "'keep_last_snapshots=' missing or malformed in /etc/lmd/auto-update.conf, using default"
+    KEEP_LAST_SNAPSHOTS=5
+fi
+
+TEMP_MOUNT=$(mktemp -d)
+MAIN_VOLUME=$(cat /proc/cmdline | sed -n 's/.* root=\([^ ]*\).*/\1/p')
+mount ${MAIN_VOLUME} ${TEMP_MOUNT}
+
+SNAPSHOTS=$(ls -1d ${TEMP_MOUNT}/@lmd-* | sort -Vr)
+DELETE=$(echo "${SNAPSHOTS}" | tail -n +$((KEEP_LAST_SNAPSHOTS + 1)))
+
+for SNAPSHOT in ${DELETE}; do
+    btrfs subvolume delete ${SNAPSHOT}
+done
+
+umount ${TEMP_MOUNT}
+rmdir ${TEMP_MOUNT}

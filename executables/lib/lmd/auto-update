@@ -1,0 +1,50 @@
+#! /bin/bash
+set -e
+
+if [[ "$(cat /proc/cmdline | sed 's/.*subvol=\([^ ]*\).*/\1/')" != "@rootfs" ]]; then
+    echo "Will not upgrade system snapshot"
+    exit
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+echo "Clean previous install in case it failed"
+dpkg --configure -a || true
+
+echo "Wait to be online"
+while ! ping -c 1 deb.debian.org &>/dev/null; do
+    sleep 10
+done
+
+echo "Finish upgrading packages in case previous upgrade was interrupted"
+apt-get dist-upgrade -m -f -y -o Dpkg::Options::="--force-confold" < /dev/null
+
+TEMP_MOUNT=$(mktemp -d)
+MAIN_VOLUME=$(cat /proc/cmdline | sed -n 's/.* root=\([^ ]*\).*/\1/p')
+SUBVOLUME=@lmd-$(date +%y%m%d%H%M%S)
+mount ${MAIN_VOLUME} ${TEMP_MOUNT}
+btrfs subvolume snapshot ${TEMP_MOUNT}/@rootfs ${TEMP_MOUNT}/${SUBVOLUME}
+
+echo "Update package sources"
+apt-get update -y
+
+UPGRADABLE=$(apt list --upgradable 2>/dev/null | tail -n +2)
+if [[ -z "${UPGRADABLE}" ]]; then
+    echo "No upgradable packages"
+    btrfs subvolume delete ${TEMP_MOUNT}/${SUBVOLUME}
+    umount ${TEMP_MOUNT}
+    rmdir ${TEMP_MOUNT}
+    exit
+fi
+
+umount ${TEMP_MOUNT}
+rmdir ${TEMP_MOUNT}
+
+echo "Clean package cache"
+apt-get clean -y < /dev/null
+
+echo "Upgrade new packages"
+apt-get dist-upgrade -m -y -o Dpkg::Options::="--force-confold" < /dev/null
+
+/lib/lmd/prune-system-snapshots
+update-grub

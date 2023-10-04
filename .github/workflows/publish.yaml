@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Publish
-        uses: lmd-linux/publish-debuild@v1
+        uses: lmd-linux/publish-debuild@v2
         with:
           repo: ${{ github.repository }}
           ssh_key: ${{ secrets.SSH_KEY }}

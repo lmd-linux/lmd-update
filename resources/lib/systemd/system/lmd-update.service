@@ -1,0 +1,6 @@
+[Unit]
+Description=lmd Linux automatic update
+
+[Service]
+Type=oneshot
+ExecStart=/lib/lmd/auto-update

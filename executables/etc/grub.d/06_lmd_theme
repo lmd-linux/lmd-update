@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+
+echo "set menu_color_normal=light-gray/black"
+echo "set menu_color_highlight=white/black"
