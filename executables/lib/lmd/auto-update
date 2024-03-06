@@ -44,6 +44,14 @@ if [[ -z "${UPDATABLE}" ]]; then
     exit
 fi
 
+OLD_KERNELS=$(dpkg --get-selections linux-image-* | sed -n 's/\([^\t]*\)\t*deinstall$/\1/p')
+if [[ -n "${OLD_KERNELS}" ]]; then
+    echo -e "Cleaning old kernel(s):\n${OLD_KERNELS}"
+    apt purge -y ${OLD_KERNELS}
+    update-initramfs -k all -u
+    update-grub
+fi
+
 umount ${TEMP_MOUNT}
 rmdir ${TEMP_MOUNT}
 
